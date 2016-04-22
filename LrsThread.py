@@ -16,12 +16,13 @@ FROM npmrds_shapefile
 WHERE link_id = %s;
 '''
 
+maxDistance = 4
 crossSql = '''
 SELECT objectid, ST_Transform(geom, 2163), direction
 FROM "LRS" AS hpms
 JOIN npmrds_shapefile AS npmrds
 ON ST_Distance(ST_Transform(wkb_geometry, 2163), 
-    ST_Transform(geom, 2163)) <= 3
+    ST_Transform(geom, 2163)) <= %s
 WHERE link_id = %s;
 '''
 
@@ -73,6 +74,7 @@ class LrsThread(threading.Thread):
             
     def processLinkId(self, linkId):
         linkGeom, linkDirection = self.getLinkGeometry(linkId)
+        minLength = linkGeom.length * 0.75
         
         linkVector, linkBuffer = self.getLinkData(linkGeom)
         
@@ -84,9 +86,11 @@ class LrsThread(threading.Thread):
                 
         finalResults = [ (linkId, key, linkDirection, lrsResults[key]) \
             for key, val in vectors.items() \
-            if math.fabs(linkVector.dotProduct(val)) >= 0.9 ]
-                
+            if math.fabs(linkVector.dotProduct(val)) >= 0.9 \
+            and intersections[key].length >= minLength ]
+            
         self.pgCursor.executemany(insertSql, finalResults)
+        LrsThread.pgConnection.commit()
         
     def getLinkGeometry(self, linkId):
         self.pgCursor.execute(linkSql, [linkId])
@@ -102,7 +106,7 @@ class LrsThread(threading.Thread):
         start = coords[0]
         end = coords[-1]
         linkVector = Vector2d(end[0]-start[0], end[1]-start[1]).normalize()
-        linkBuffer = linkGeom.envelope.buffer(1.5)
+        linkBuffer = linkGeom.envelope.buffer(maxDistance)
         
         return linkVector, linkBuffer
         
@@ -110,9 +114,9 @@ class LrsThread(threading.Thread):
         lrsResults = {}
         lrsGeometries = {}
         
-        self.pgCursor.execute(crossSql, [linkId])
+        self.pgCursor.execute(crossSql, [maxDistance, linkId])
         
-        for item in  self.pgCursor:
+        for item in self.pgCursor:
             key = item[0]
             lrsResults[key] = item[2]
             lrsGeometries[key] = wkb.loads(item[1], hex=True)
