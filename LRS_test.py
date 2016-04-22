@@ -5,15 +5,27 @@ def main():
     connectionData = None
     try:
         connectionData = getConnectionData()
-    except:
-        pass
+    except Exception as e:
+        print "Could not read file: 'connectionData.json'"
+        print "Exception:", e
     
     if not connectionData:
-        print "Could not read file: 'connectionData.json'"
+        print "Connection data undefined!"
         print "Exiting..."
         return
     
-    connection = psycopg2.connect(**connectionData)
+    connection = None
+    try:
+        connection = psycopg2.connect(**connectionData)
+    except Exception as e:
+        print "Count not connect to database!"
+        print "Exception:", e
+    
+    if not connection:
+        print "Connection to databse not established!"
+        print "Exiting..."
+        return
+        
     cursor = connection.cursor()
     
     linkIds = getLinkIds(cursor)
