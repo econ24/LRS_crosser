@@ -6,7 +6,7 @@ def main():
     try:
         connectionData = getConnectionData()
     except Exception as e:
-        print "Could not read file: 'connectionData.json'"
+        print "There was an exception while attempting to read file: 'connectionData.json'"
         print "Exception:", e
     
     if not connectionData:
@@ -18,11 +18,11 @@ def main():
     try:
         connection = psycopg2.connect(**connectionData)
     except Exception as e:
-        print "Count not connect to database!"
+        print "There was an exception while attempting connection to database"
         print "Exception:", e
     
     if not connection:
-        print "Connection to databse not established!"
+        print "Connection to database not established!"
         print "Exiting..."
         return
         
