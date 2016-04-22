@@ -1,13 +1,6 @@
 import psycopg2
 from LrsThread import LrsThread, initLrsThread
 
-connectionData = {
-    "host": "lor.availabs.org",
-    "user": "postgres",
-    "password": "transit",
-    "database": "NHS_NPMRDS"
-}
-
 def main():
     connection = psycopg2.connect(**connectionData)
     cursor = connection.cursor()
