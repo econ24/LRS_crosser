@@ -8,7 +8,10 @@ from LrsChecker import LrsChecker
 def main():
     if len(sys.argv) < 2:
         print '''
-        Usage: LRS_2_NPMRDS.py <5 digit (state + county) fips code> [num threads]
+        Usage: LRS_x_NPMRDS.py <fips> [threads]
+        
+        fips: 5 digit (2 state + 3 county) fips code
+        threads: number of threads process will spawn
         '''
         return
         
