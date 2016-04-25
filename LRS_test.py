@@ -73,18 +73,10 @@ def getCountyLinks(cursor, fips):
         JOIN tl_2013_us_county AS bounds 
         ON statefp = %s AND countyfp = %s 
         WHERE ST_Intersects(bounds.the_geom, npmrds.wkb_geometry)
+        AND link_id NOT IN (SELECT DISTINCT link_id FROM lrs_lut)
     '''
     cursor.execute(sql, [ fips[0:2], fips[2:] ])
-    linkIds = [ int(result[0]) for result in cursor ]
-    
-    sql = '''
-        SELECT DISTINCT link_id 
-        FROM lrs_lut
-    '''
-    cursor.execute(sql)
-    linkSet = set([ int(result[0]) for result in cursor ])
-    
-    return [ linkId for linkId in linkIds if linkId not in linkSet ]
+    return [ int(result[0]) for result in cursor ]
 
 if __name__ == "__main__":
     main()
