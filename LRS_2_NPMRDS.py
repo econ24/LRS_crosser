@@ -6,11 +6,15 @@ from LrsChecker import LrsChecker
 #linkIds = [91924188]
 
 def main():
-    if len(sys.argv) != 2:
+    if len(sys.argv) < 2:
         print '''
-        "Usage: LRS_test.py <5 digit (state + county) fips code>
+        Usage: LRS_2_NPMRDS.py <5 digit (state + county) fips code> [num threads]
         '''
         return
+        
+    numThreads = 4
+    if (len(sys.argv) == 3):
+        numThreads = int(sys.argv[2])
         
     connectionData = None
     try:
@@ -46,7 +50,7 @@ def main():
     
     initLrsThread(connection, linkIds)
     
-    threads = [ LrsThread(x) for x in range(4) ]
+    threads = [ LrsThread(x) for x in range(numThreads) ]
         
     lrsChecker = LrsChecker(len(threads))
     
