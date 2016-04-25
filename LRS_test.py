@@ -1,7 +1,13 @@
-import psycopg2, json
+import psycopg2, json, sys
 from LrsThread import LrsThread, initLrsThread
 
 def main():
+    if len(sys.argv) != 2:
+        print '''
+        "Usage: LRS_test.py <5 digit (state + county) fips code>
+        '''
+        return
+        
     connectionData = None
     try:
         connectionData = getConnectionData()
@@ -28,7 +34,9 @@ def main():
         
     cursor = connection.cursor()
     
-    linkIds = getLinkIds(cursor)
+    fips = str(sys.argv[1])
+    
+    linkIds = getCountyLinks(cursor, fips)
     
     cursor.close()
     
@@ -49,14 +57,25 @@ def getConnectionData():
     with open("./connectionData.json") as jsonFile:
         return json.load(jsonFile, encoding="utf-8")
     
-def getLinkIds(cursor):
+def getCountyLinks(cursor, fips):
     sql = '''
-        SELECT link_id
-        FROM npmrds_shapefile
-        WHERE st_name LIKE 'WOLF RD'
-        '''
+        SELECT link_id 
+        FROM npmrds_shapefile AS npmrds 
+        JOIN tl_2013_us_county AS bounds 
+        ON statefp = %s AND countyfp = %s 
+        WHERE ST_Intersects(bounds.the_geom, npmrds.wkb_geometry)
+    '''
+    cursor.execute(sql, [ fips[0:2], fips[2:] ])
+    linkIds = [ int(result[0]) for result in cursor ]
+    
+    sql = '''
+        SELECT DISTINCT link_id 
+        FROM lrs_lut
+    '''
     cursor.execute(sql)
-    return [ int(result[0]) for result in cursor ]
+    linkSet = set([ int(result[0]) for result in cursor ])
+    
+    return [ linkId for linkId in linkIds if linkId not in linkSet ]
 
 if __name__ == "__main__":
     main()
