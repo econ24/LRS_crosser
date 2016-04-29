@@ -78,8 +78,8 @@ def getCountyLinks(cursor, fips):
         SELECT link_id 
         FROM npmrds_shapefile AS npmrds 
         JOIN tl_2013_us_county AS bounds 
-        ON statefp = %s AND countyfp = %s 
-        WHERE ST_Intersects(bounds.the_geom, npmrds.wkb_geometry)
+        ON ST_Intersects(bounds.the_geom, npmrds.wkb_geometry) 
+        WHERE statefp = %s AND countyfp = %s 
         AND link_id NOT IN (SELECT DISTINCT link_id FROM lrs_lut)
     '''
     cursor.execute(sql, [ fips[0:2], fips[2:] ])
