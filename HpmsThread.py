@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Created on Thu Apr 21 15:14:48 2016
+Created on Fri May  6 12:16:47 2016
 
 @author: econ24
 """
@@ -11,27 +11,29 @@ from shapely import wkb
 from Vector2d import Vector2d
     
 linkSql = '''
-SELECT ST_Transform(wkb_geometry, 2163), dir_travel
+SELECT ST_Transform(wkb_geometry, 2163)
 FROM npmrds_shapefile
 WHERE link_id = %s;
 '''
 
 maxDistance = 4
+lengthThreshold = 0.5
+
 crossSql = '''
-SELECT objectid, ST_Transform(geom, 2163), direction
-FROM "LRS" 
-JOIN npmrds_shapefile 
+SELECT "ROUTE_ID" AS route_id, ST_Transform(geom, 2163), feat_id 
+FROM hpms_ny_2013 AS hpms
+JOIN npmrds_shapefile AS npmrds
 ON ST_Distance(ST_Transform(wkb_geometry, 2163), 
     ST_Transform(geom, 2163)) <= %s
 WHERE link_id = %s;
 '''
 
 insertSql = '''
-INSERT INTO lrs_lut
-VALUES (%s, %s, %s, %s);
+INSERT INTO hpms_lut
+VALUES (%s, %s, %s);
 '''
 
-class LrsThread(threading.Thread):
+class HpmsThread(threading.Thread):
 
     pgConnection = None
     linkIdList = []
@@ -44,8 +46,8 @@ class LrsThread(threading.Thread):
         self.name = "thread-" + str(name)
         
     def getCursor(self):
-        if LrsThread.pgConnection:
-            return LrsThread.pgConnection.cursor()
+        if HpmsThread.pgConnection:
+            return HpmsThread.pgConnection.cursor()
             
         return None
         
@@ -57,14 +59,14 @@ class LrsThread(threading.Thread):
             
             linkId = None
             
-            LrsThread.listLock.acquire()
+            HpmsThread.listLock.acquire()
             
-            if len(LrsThread.linkIdList):
-                linkId = LrsThread.linkIdList.pop()
+            if len(HpmsThread.linkIdList):
+                linkId = HpmsThread.linkIdList.pop()
             
-            self.workToDo = bool(len(LrsThread.linkIdList))
+            self.workToDo = bool(len(HpmsThread.linkIdList))
             
-            LrsThread.listLock.release()
+            HpmsThread.listLock.release()
             
             if linkId:
                 self.processLinkId(linkId)
@@ -73,33 +75,32 @@ class LrsThread(threading.Thread):
         self.pgCursor.close()
             
     def processLinkId(self, linkId):
-        linkGeom, linkDirection = self.getLinkGeometry(linkId)
-        minLength = linkGeom.length * 0.75
+        linkGeom = self.getLinkGeometry(linkId)
+        minLength = linkGeom.length * lengthThreshold
         
         linkVector, linkBuffer = self.getLinkData(linkGeom)
         
-        lrsResults, lrsGeometries = self.getLrsDicts(linkId)
+        npmrdsFeatIds, hpmsGeometries = self.getHpmsDicts(linkId)
         
-        intersections = self.getIntersections(linkBuffer, lrsGeometries)
+        intersections = self.getIntersections(linkBuffer, hpmsGeometries)
             
         vectors = self.getVectors(intersections)
                 
-        finalResults = [ (linkId, key, linkDirection, lrsResults[key]) \
+        finalResults = [ (linkId, key, npmrdsFeatIds[key]) \
             for key, val in vectors.items() \
             if math.fabs(linkVector.dotProduct(val)) >= 0.9 \
             and intersections[key].length >= minLength ]
             
         self.pgCursor.executemany(insertSql, finalResults)
-        LrsThread.pgConnection.commit()
+        HpmsThread.pgConnection.commit()
         
     def getLinkGeometry(self, linkId):
         self.pgCursor.execute(linkSql, [linkId])
         result = self.pgCursor.fetchone()
         
         linkGeom = wkb.loads(result[0], hex=True)
-        linkDirection = result[1]
         
-        return linkGeom, linkDirection
+        return linkGeom
         
     def getLinkData(self, linkGeom):
         coords = linkGeom.coords
@@ -110,22 +111,22 @@ class LrsThread(threading.Thread):
         
         return linkVector, linkBuffer
         
-    def getLrsDicts(self, linkId):
-        lrsResults = {}
-        lrsGeometries = {}
+    def getHpmsDicts(self, linkId):
+        hpmsGeometries = {}
+        npmrdsFeatIds = {}
         
         self.pgCursor.execute(crossSql, [maxDistance, linkId])
         
         for item in self.pgCursor:
             key = item[0]
-            lrsResults[key] = item[2]
-            lrsGeometries[key] = wkb.loads(item[1], hex=True)
+            npmrdsFeatIds[key] = item[2]
+            hpmsGeometries[key] = wkb.loads(item[1], hex=True)
             
-        return lrsResults, lrsGeometries
+        return npmrdsFeatIds, hpmsGeometries
         
-    def getIntersections(self, linkBuffer, lrsGeometries):
+    def getIntersections(self, linkBuffer, hpmsGeometries):
         return { key: val.intersection(linkBuffer) \
-            for key, val in lrsGeometries.items() }
+            for key, val in hpmsGeometries.items() }
         
     def getVectors(self, intersections):
         vectors = {}
@@ -142,7 +143,7 @@ class LrsThread(threading.Thread):
                 
         return vectors
 
-def initLrsThread(pgConn, linkList):
-    LrsThread.pgConnection = pgConn
-    LrsThread.linkIdList = linkList
-    LrsThread.listLock = threading.Lock()
+def initHpmsThread(pgConn, linkList):
+    HpmsThread.pgConnection = pgConn
+    HpmsThread.linkIdList = linkList
+    HpmsThread.listLock = threading.Lock()
