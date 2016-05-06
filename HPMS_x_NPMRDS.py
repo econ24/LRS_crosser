@@ -86,7 +86,9 @@ def getCountyLinks(cursor, fips):
         WHERE statefp = %s AND countyfp = %s 
         AND link_id NOT IN (SELECT DISTINCT link_id FROM hpms_lut)
     '''
-    #cursor.execute(sql, [ fips[0:2], fips[2:] ])
+    cursor.execute(sql, [ fips[0:2], fips[2:] ])
+    
+def getRoadLinks(cursor):
     sql = '''
         SELECT link_id
         FROM npmrds_shapefile
