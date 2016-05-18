@@ -16,11 +16,12 @@ FROM npmrds_shapefile
 WHERE link_id = %s;
 '''
 
-maxDistance = 4
-lengthThreshold = 0.5
+distanceThreshhold = 4      # meters
+lengthThreshold = 0.5       # as a percent of comparison link length
+dotProductThreshold = 0.98  # for angle detection
 
 crossSql = '''
-SELECT "ROUTE_ID" AS route_id, ST_Transform(geom, 2163), feat_id 
+SELECT DISTINCT "ROUTE_ID" AS route_id, ST_Transform(geom, 2163), feat_id 
 FROM hpms_ny_2013 AS hpms
 JOIN npmrds_shapefile AS npmrds
 ON ST_Distance(ST_Transform(wkb_geometry, 2163), 
@@ -88,7 +89,7 @@ class HpmsThread(threading.Thread):
                 
         finalResults = [ (linkId, key, npmrdsFeatIds[key]) \
             for key, val in vectors.items() \
-            if math.fabs(linkVector.dotProduct(val)) >= 0.9 \
+            if math.fabs(linkVector.dotProduct(val)) >= dotProductThreshold \
             and intersections[key].length >= minLength ]
             
         self.pgCursor.executemany(insertSql, finalResults)
@@ -107,7 +108,7 @@ class HpmsThread(threading.Thread):
         start = coords[0]
         end = coords[-1]
         linkVector = Vector2d(end[0]-start[0], end[1]-start[1]).normalize()
-        linkBuffer = linkGeom.envelope.buffer(maxDistance)
+        linkBuffer = linkGeom.envelope.buffer(distanceThreshhold)
         
         return linkVector, linkBuffer
         
@@ -115,7 +116,7 @@ class HpmsThread(threading.Thread):
         hpmsGeometries = {}
         npmrdsFeatIds = {}
         
-        self.pgCursor.execute(crossSql, [maxDistance, linkId])
+        self.pgCursor.execute(crossSql, [distanceThreshhold, linkId])
         
         for item in self.pgCursor:
             key = item[0]

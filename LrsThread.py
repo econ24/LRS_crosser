@@ -17,8 +17,11 @@ WHERE link_id = %s;
 '''
 
 maxDistance = 4
+lengthThreshold = 0.5
+dotProductThreshold = 0.98
+
 crossSql = '''
-SELECT objectid, ST_Transform(geom, 2163), direction
+SELECT DISTINCT objectid, ST_Transform(geom, 2163), direction
 FROM "LRS" 
 JOIN npmrds_shapefile 
 ON ST_Distance(ST_Transform(wkb_geometry, 2163), 
@@ -74,7 +77,7 @@ class LrsThread(threading.Thread):
             
     def processLinkId(self, linkId):
         linkGeom, linkDirection = self.getLinkGeometry(linkId)
-        minLength = linkGeom.length * 0.75
+        minLength = linkGeom.length * lengthThreshold
         
         linkVector, linkBuffer = self.getLinkData(linkGeom)
         
@@ -86,7 +89,7 @@ class LrsThread(threading.Thread):
                 
         finalResults = [ (linkId, key, linkDirection, lrsResults[key]) \
             for key, val in vectors.items() \
-            if math.fabs(linkVector.dotProduct(val)) >= 0.9 \
+            if math.fabs(linkVector.dotProduct(val)) >= dotProductThreshold \
             and intersections[key].length >= minLength ]
             
         self.pgCursor.executemany(insertSql, finalResults)

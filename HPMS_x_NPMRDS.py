@@ -7,21 +7,38 @@ Created on Fri May  6 12:08:23 2016
 
 import psycopg2, json, sys
 from HpmsThread import HpmsThread, initHpmsThread
+from HpmsThreadSecondPass import HpmsSecondPass, initHpmsSecondPass
 from ThreadChecker import ThreadChecker
 
 def main():
     if len(sys.argv) < 2:
         print '''
-        Usage: HPMS_x_NPMRDS.py <fips> [threads]
+        Usage: HPMS_x_NPMRDS.py <fips> [threads] [-sp]
         
         fips: 5 digit (2 state + 3 county) fips code
-        threads: number of threads process will spawn
+        threads: number of threads process will spawn, defaults to 4
+        -sp: runs the HPMS second pass
         '''
         return
         
     numThreads = 4
-    if (len(sys.argv) == 3):
-        numThreads = int(sys.argv[2])
+    secondPass = False
+    if (len(sys.argv) > 2):
+        arg = sys.argv[2]
+        if arg == '-sp':
+            secondPass = True
+        else:
+            numThreads = int(sys.argv[2])
+    if (len(sys.argv) > 3):
+        arg = sys.argv[3]
+        if arg == '-sp':
+            secondPass = True
+        else:
+            numThreads = int(sys.argv[3])
+          
+    print "NUMBER OF THREADS:", numThreads
+    print "SECOND PASS:", secondPass
+    return
         
     connectionData = None
     try:
@@ -55,9 +72,12 @@ def main():
     
     cursor.close()
     
-    initHpmsThread(connection, linkIds)
-    
-    threads = [ HpmsThread(x) for x in range(numThreads) ]
+    if secondPass:
+        initHpmsSecondPass(connection, linkIds)
+        threads = [ HpmsSecondPass(x) for x in range(numThreads) ]
+    else:
+        initHpmsThread(connection, linkIds)
+        threads = [ HpmsThread(x) for x in range(numThreads) ]
         
     threadChecker = ThreadChecker(threads, HpmsThread.linkIdList)
     
