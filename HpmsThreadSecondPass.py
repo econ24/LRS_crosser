@@ -16,7 +16,7 @@ FROM npmrds_shapefile
 WHERE link_id = %s;
 '''
 
-distanceThreshhold = 10     # meters
+distanceThreshhold = 20     # meters
 lengthThreshold = 0.5       # as a percent of comparison link length
 dotProductThreshold = 0.98  # for angle detection
 
