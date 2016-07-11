@@ -35,10 +35,6 @@ def main():
             secondPass = True
         else:
             numThreads = int(sys.argv[3])
-          
-    print "NUMBER OF THREADS:", numThreads
-    print "SECOND PASS:", secondPass
-    return
         
     connectionData = None
     try:
