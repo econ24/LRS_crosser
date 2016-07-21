@@ -21,18 +21,18 @@ lengthThreshold = 0.5       # as a percent of comparison link length
 dotProductThreshold = 0.98  # for angle detection
 
 crossSql = '''
-SELECT DISTINCT "ROUTE_ID" AS route_id, ST_Transform(geom, 2163), feat_id 
-FROM hpms_ny_2013 AS hpms 
+SELECT DISTINCT hpms.id AS hpms_id, route_id, feat_id, ST_Transform(geom, 2163)
+FROM hpms_newyork_2013 AS hpms
 JOIN npmrds_shapefile AS npmrds 
 ON ST_Distance(ST_Transform(wkb_geometry, 2163), 
     ST_Transform(geom, 2163)) <= %s 
 WHERE link_id = %s 
-AND "ROUTE_ID" IN (SELECT DISTINCT route_id FROM hpms_lut);
+AND hpms.id IN (SELECT DISTINCT hpms_id FROM hpms_lut);
 '''
 
 insertSql = '''
 INSERT INTO hpms_lut
-VALUES (%s, %s, %s);
+VALUES (%s, %s, %s, %s);
 '''
 
 class HpmsSecondPass(threading.Thread):
@@ -82,13 +82,13 @@ class HpmsSecondPass(threading.Thread):
         
         linkVector, linkBuffer = self.getLinkData(linkGeom)
         
-        npmrdsFeatIds, hpmsGeometries = self.getHpmsDicts(linkId)
+        hpmsRouteIds, npmrdsFeatIds, hpmsGeometries = self.getHpmsDicts(linkId)
         
         intersections = self.getIntersections(linkBuffer, hpmsGeometries)
             
         vectors = self.getVectors(intersections)
                 
-        finalResults = [ (linkId, key, npmrdsFeatIds[key]) \
+        finalResults = [ (linkId, key, hpmsRouteIds[key], npmrdsFeatIds[key]) \
             for key, val in vectors.items() \
             if math.fabs(linkVector.dotProduct(val)) >= dotProductThreshold \
             and intersections[key].length >= minLength ]
@@ -115,16 +115,19 @@ class HpmsSecondPass(threading.Thread):
         
     def getHpmsDicts(self, linkId):
         hpmsGeometries = {}
+        hpmsRouteIds = {}
         npmrdsFeatIds = {}
         
+        # hpms_id, route_id, feat_id, ST_Transform(geom, 2163)
         self.pgCursor.execute(crossSql, [distanceThreshhold, linkId])
         
         for item in self.pgCursor:
             key = item[0]
+            hpmsRouteIds[key] = item[1]
             npmrdsFeatIds[key] = item[2]
-            hpmsGeometries[key] = wkb.loads(item[1], hex=True)
+            hpmsGeometries[key] = wkb.loads(item[3], hex=True)
             
-        return npmrdsFeatIds, hpmsGeometries
+        return hpmsRouteIds, npmrdsFeatIds, hpmsGeometries
         
     def getIntersections(self, linkBuffer, hpmsGeometries):
         return { key: val.intersection(linkBuffer) \

@@ -71,11 +71,12 @@ def main():
     if secondPass:
         initHpmsSecondPass(connection, linkIds)
         threads = [ HpmsSecondPass(x) for x in range(numThreads) ]
+        threadChecker = ThreadChecker(threads, HpmsSecondPass.linkIdList)
     else:
         initHpmsThread(connection, linkIds)
         threads = [ HpmsThread(x) for x in range(numThreads) ]
+        threadChecker = ThreadChecker(threads, HpmsThread.linkIdList)
         
-    threadChecker = ThreadChecker(threads, HpmsThread.linkIdList)
     
     for thread in threads:
         thread.start()
